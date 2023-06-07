@@ -49,6 +49,7 @@ import org.openapitools.codegen.languages.AbstractJavaCodegen;
 import org.openapitools.codegen.languages.JavaClientCodegen;
 import org.openapitools.codegen.languages.features.BeanValidationFeatures;
 import org.openapitools.codegen.languages.features.CXFServerFeatures;
+import org.openapitools.codegen.meta.features.SecurityFeature;
 import org.openapitools.codegen.model.OperationMap;
 import org.openapitools.codegen.model.OperationsMap;
 import org.testng.Assert;
@@ -212,6 +213,42 @@ public class JavaClientCodegenTest {
         Assert.assertEquals(codegen.getInvokerPackage(), "xyz.yyyyy.zzzzzzz.iiii.invoker");
         Assert.assertEquals(codegen.additionalProperties().get(CodegenConstants.INVOKER_PACKAGE), "xyz.yyyyy.zzzzzzz.iiii.invoker");
         Assert.assertEquals(codegen.getSerializationLibrary(), JavaClientCodegen.SERIALIZATION_LIBRARY_JACKSON);
+    }
+
+    @Test
+    public void testGeneratedAuthClassesJersey() throws IOException {
+        Map<String, Object> properties = new HashMap<>();
+        properties.put(CodegenConstants.API_PACKAGE, "xyz.abcdef.api");
+
+        File output = Files.createTempDirectory("test").toFile();
+
+        final CodegenConfigurator configurator = new CodegenConfigurator()
+                .setGeneratorName("java")
+                .setLibrary(JavaClientCodegen.JERSEY3)
+                .setAdditionalProperties(properties)
+                .setInputSpec("src/test/resources/3_0/petstore-with-fake-endpoints-models-for-testing-with-http-signature.yaml")
+                .setOutputDir(output.getAbsolutePath().replace("\\", "/"));
+
+        final ClientOptInput clientOptInput = configurator.toClientOptInput();
+
+        DefaultGenerator generator = new DefaultGenerator();
+
+        List<File> files = generator.opts(clientOptInput).generate();
+
+        TestUtils.ensureContainsFile(files, output, "src/main/java/xyz/abcdef/auth/ApiKeyAuth.java");
+        TestUtils.ensureContainsFile(files, output, "src/main/java/xyz/abcdef/auth/Authentication.java");
+        TestUtils.ensureContainsFile(files, output, "src/main/java/xyz/abcdef/auth/HttpBasicAuth.java");
+        TestUtils.ensureContainsFile(files, output, "src/main/java/xyz/abcdef/auth/HttpBearerAuth.java");
+        TestUtils.ensureContainsFile(files, output, "src/main/java/xyz/abcdef/auth/HttpSignatureAuth.java");
+    }
+
+    @Test
+    public void testSupportedSecuritySchemesJersey() throws Exception {
+        final JavaClientCodegen codegen = new JavaClientCodegen();
+        codegen.additionalProperties().put(CodegenConstants.LIBRARY, JavaClientCodegen.JERSEY3);
+        codegen.processOpts();
+
+        Assert.assertTrue(codegen.getFeatureSet().getSecurityFeatures().contains(SecurityFeature.SignatureAuth));
     }
 
     @Test
@@ -1372,6 +1409,11 @@ public class JavaClientCodegenTest {
     }
 
     @Test
+    public void testExtraAnnotationsJersey3() throws IOException {
+        testExtraAnnotations(JavaClientCodegen.JERSEY3);
+    }
+
+    @Test
     public void testExtraAnnotationsMicroprofile() throws IOException {
         testExtraAnnotations(JavaClientCodegen.MICROPROFILE);
     }
@@ -1908,4 +1950,177 @@ public class JavaClientCodegenTest {
         assertFileNotContains(Paths.get(outputPath + "/src/main/java/org/openapitools/client/model/Pet.java"), "@JsonSubTypes.Type(value = Dog.class, name = \"Dog\")");
         assertFileNotContains(Paths.get(outputPath + "/src/main/java/org/openapitools/client/model/Pet.java"), "@JsonSubTypes.Type(value = Lizard.class, name = \"Lizard\")");
     }
+
+    @Test
+    public void testIsOverriddenProperty() {
+        final OpenAPI openAPI = TestUtils.parseFlattenSpec("src/test/resources/3_0/allOf_composition_discriminator.yaml");
+        JavaClientCodegen codegen = new JavaClientCodegen();
+
+        Schema test1 = openAPI.getComponents().getSchemas().get("Cat");
+        codegen.setOpenAPI(openAPI);
+        CodegenModel cm1 = codegen.fromModel("Cat", test1);
+
+        CodegenProperty cp0 = cm1.getAllVars().get(0);
+        Assert.assertEquals(cp0.getName(), "petType");
+        Assert.assertEquals(cp0.isOverridden, true);
+
+        CodegenProperty cp1 = cm1.getAllVars().get(1);
+        Assert.assertEquals(cp1.getName(), "name");
+        Assert.assertEquals(cp1.isOverridden, false);
+    }
+
+    @Test
+    public void testForJavaApacheHttpClientOverrideSetter() throws IOException {
+        File output = Files.createTempDirectory("test").toFile().getCanonicalFile();
+        output.deleteOnExit();
+        String outputPath = output.getAbsolutePath().replace('\\', '/');
+        OpenAPI openAPI = new OpenAPIParser()
+                .readLocation("src/test/resources/3_0/allOf_composition_discriminator.yaml", null, new ParseOptions()).getOpenAPI();
+
+        JavaClientCodegen codegen = new JavaClientCodegen();
+        codegen.setOutputDir(output.getAbsolutePath());
+
+        ClientOptInput input = new ClientOptInput();
+        input.openAPI(openAPI);
+        input.config(codegen);
+
+        DefaultGenerator generator = new DefaultGenerator();
+        codegen.setLibrary(JavaClientCodegen.APACHE);
+
+        generator.opts(input).generate();
+
+        assertFileContains(Paths.get(outputPath + "/src/main/java/org/openapitools/client/model/Cat.java"), "  @Override\n" +
+                "  public Cat petType(String petType) {");
+        assertFileContains(Paths.get(outputPath + "/src/main/java/org/openapitools/client/model/Pet.java"), "  }\n" +
+                "\n" +
+                "  public Pet petType(String petType) {\n");
+
+    }
+
+    @Test
+    public void testForJavaNativeClientOverrideSetter() throws IOException {
+        File output = Files.createTempDirectory("test").toFile().getCanonicalFile();
+        output.deleteOnExit();
+        String outputPath = output.getAbsolutePath().replace('\\', '/');
+        OpenAPI openAPI = new OpenAPIParser()
+                .readLocation("src/test/resources/3_0/allOf_composition_discriminator.yaml", null, new ParseOptions()).getOpenAPI();
+
+        JavaClientCodegen codegen = new JavaClientCodegen();
+        codegen.setOutputDir(output.getAbsolutePath());
+
+        ClientOptInput input = new ClientOptInput();
+        input.openAPI(openAPI);
+        input.config(codegen);
+
+        DefaultGenerator generator = new DefaultGenerator();
+        codegen.setLibrary(JavaClientCodegen.NATIVE);
+
+        generator.opts(input).generate();
+
+        assertFileContains(Paths.get(outputPath + "/src/main/java/org/openapitools/client/model/Cat.java"), "  @Override\n" +
+                "  public Cat petType(String petType) {");
+        assertFileContains(Paths.get(outputPath + "/src/main/java/org/openapitools/client/model/Pet.java"), "  }\n" +
+                "\n" +
+                "  public Pet petType(String petType) {\n");
+
+    }
+
+    @Test
+    public void testDeprecatedProperty() throws Exception {
+        File output = Files.createTempDirectory("test").toFile();
+
+        final CodegenConfigurator configurator = new CodegenConfigurator()
+                .setGeneratorName("java")
+                .setLibrary(JavaClientCodegen.OKHTTP_GSON)
+                .setInputSpec("src/test/resources/3_0/deprecated-properties.yaml")
+                .setOutputDir(output.getAbsolutePath().replace("\\", "/"));
+
+        final ClientOptInput clientOptInput = configurator.toClientOptInput();
+        DefaultGenerator generator = new DefaultGenerator();
+        List<File> files = generator.opts(clientOptInput).generate();
+
+        validateJavaSourceFiles(files);
+
+        // deprecated builder method
+        TestUtils.assertFileContains(Paths.get(output + "/src/main/java/org/openapitools/client/model/BigDog.java"),
+                "@Deprecated\n" +
+                        " public BigDog declawed(Boolean declawed) {");
+
+        // deprecated getter
+        TestUtils.assertFileContains(Paths.get(output + "/src/main/java/org/openapitools/client/model/BigDog.java"),
+                "@Deprecated\n" +
+                        " @javax.annotation.Nullable\n" +
+                        "\n" +
+                        " public Boolean getDeclawed() {");
+        // deprecated setter
+        TestUtils.assertFileContains(Paths.get(output + "/src/main/java/org/openapitools/client/model/BigDog.java"),
+                "@Deprecated\n" +
+                " public void setDeclawed(Boolean declawed) {");
+
+
+        output.deleteOnExit();
+    }
+
+    @Test
+    public void testRestTemplateWithGeneratedClientAsBeanDisabled() throws IOException {
+
+        Map<String, Object> properties = new HashMap<>();
+        properties.put(CodegenConstants.API_PACKAGE, "xyz.abcdef.api");
+        properties.put(JavaClientCodegen.GENERATE_CLIENT_AS_BEAN, false);
+
+        File output = Files.createTempDirectory("test").toFile();
+        output.deleteOnExit();
+
+        final CodegenConfigurator configurator = new CodegenConfigurator()
+                .setGeneratorName("java")
+                .setLibrary(JavaClientCodegen.RESTTEMPLATE)
+                .setAdditionalProperties(properties)
+                .setInputSpec("src/test/resources/3_0/petstore.yaml")
+                .setOutputDir(output.getAbsolutePath().replace("\\", "/"));
+
+
+        DefaultGenerator generator = new DefaultGenerator();
+        List<File> files = generator.opts(configurator.toClientOptInput()).generate();
+        files.forEach(File::deleteOnExit);
+
+        validateJavaSourceFiles(files);
+
+        Path apiClient = Paths.get(output + "/src/main/java/xyz/abcdef/ApiClient.java");
+        TestUtils.assertFileNotContains(apiClient, "@Component");
+
+        Path petApi = Paths.get(output + "/src/main/java/xyz/abcdef/api/PetApi.java");
+        TestUtils.assertFileNotContains(petApi, "@Component");
+    }
+
+    @Test
+    public void testRestTemplateWithGeneratedClientAsBeanEnabled() throws IOException {
+
+        Map<String, Object> properties = new HashMap<>();
+        properties.put(CodegenConstants.API_PACKAGE, "xyz.abcdef.api");
+        properties.put(JavaClientCodegen.GENERATE_CLIENT_AS_BEAN, true);
+
+        File output = Files.createTempDirectory("test").toFile();
+        output.deleteOnExit();
+
+        final CodegenConfigurator configurator = new CodegenConfigurator()
+                .setGeneratorName("java")
+                .setLibrary(JavaClientCodegen.RESTTEMPLATE)
+                .setAdditionalProperties(properties)
+                .setInputSpec("src/test/resources/3_0/petstore.yaml")
+                .setOutputDir(output.getAbsolutePath().replace("\\", "/"));
+
+
+        DefaultGenerator generator = new DefaultGenerator();
+        List<File> files = generator.opts(configurator.toClientOptInput()).generate();
+        files.forEach(File::deleteOnExit);
+
+        validateJavaSourceFiles(files);
+
+        Path apiClient = Paths.get(output + "/src/main/java/xyz/abcdef/ApiClient.java");
+        TestUtils.assertFileContains(apiClient, "@Component");
+
+        Path petApi = Paths.get(output + "/src/main/java/xyz/abcdef/api/PetApi.java");
+        TestUtils.assertFileContains(petApi, "@Component");
+    }
+
 }

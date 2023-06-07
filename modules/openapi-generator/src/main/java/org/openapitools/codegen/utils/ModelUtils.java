@@ -524,6 +524,11 @@ public class ModelUtils {
      * @return true if the specified schema is a Map schema.
      */
     public static boolean isMapSchema(Schema schema) {
+        // additionalProperties explicitly set to false
+        if (schema.getAdditionalProperties() instanceof Boolean && Boolean.FALSE.equals(schema.getAdditionalProperties())) {
+            return false;
+        }
+
         return (schema instanceof MapSchema) ||
                 (schema.getAdditionalProperties() instanceof Schema) ||
                 (schema.getAdditionalProperties() instanceof Boolean && (Boolean) schema.getAdditionalProperties());
@@ -1360,14 +1365,6 @@ public class ModelUtils {
                 // In this particular case there is no need to specify a discriminator.
                 hasAmbiguousParents = false;
             }
-        }
-
-        if (refedWithoutDiscriminator.size() == 1 && hasAmbiguousParents) {
-            // allOf with a single $ref (no discriminator)
-            // TODO to be removed in 5.x or 6.x release
-            LOGGER.info("[deprecated] inheritance without use of 'discriminator.propertyName' has been deprecated" +
-                            " in the 5.x release. Composed schema name: {}. Title: {}",
-                    composedSchema.getName(), composedSchema.getTitle());
         }
 
         return null;
