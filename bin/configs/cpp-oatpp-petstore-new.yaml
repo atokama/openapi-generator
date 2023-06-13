@@ -1,6 +1,6 @@
-generatorName: cpp-oatpp
-outputDir: samples/server/petstore/cpp/oatpp
+generatorName: cpp-oatpp-server
+outputDir: samples/server/petstore/cpp-oatpp-server
 inputSpec: modules/openapi-generator/src/test/resources/3_0/petstore.yaml
-templateDir: modules/openapi-generator/src/main/resources/cpp-oatpp
+templateDir: modules/openapi-generator/src/main/resources/cpp-oatpp-server
 additionalProperties:
   hideGenerationTimestamp: "true"

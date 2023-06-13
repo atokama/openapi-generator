@@ -12,7 +12,7 @@ public class CppOatppServerCodegenOptionsProvider implements OptionsProvider {
 
     @Override
     public String getLanguage() {
-        return "cpp-oatpp";
+        return "cpp-oatpp-server";
     }
 
     @Override

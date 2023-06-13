@@ -24,20 +24,20 @@ public class CppOatppServerCodegen extends DefaultCodegen implements CodegenConf
     }
 
     public String getName() {
-        return "cpp-oatpp";
+        return "cpp-oatpp-server";
     }
 
     public String getHelp() {
-        return "Generates a cpp-oatpp server.";
+        return "Generates a cpp-oatpp-server server.";
     }
 
     public CppOatppServerCodegen() {
         super();
 
-        outputFolder = "generated-code" + File.separator + "cpp-oatpp";
+        outputFolder = "generated-code" + File.separator + "cpp-oatpp-server";
         modelTemplateFiles.put("model.mustache", ".zz");
         apiTemplateFiles.put("api.mustache", ".zz");
-        embeddedTemplateDir = templateDir = "cpp-oatpp";
+        embeddedTemplateDir = templateDir = "cpp-oatpp-server";
         apiPackage = "Apis";
         modelPackage = "Models";
         supportingFiles.add(new SupportingFile("README.mustache", "", "README.md"));
